@@ -511,7 +511,7 @@ async function analyse(S){
   S.finished=NOW();
   S.cache=[...new Set(CACHE_USED.map(c=>c.label+" de "+fmtDate(c.at)))];
   const R=build(S); render(S,R); window.__ANALISE__={S,R};
-  saveHistory(S,R);
+  saveHistory(S,R); notifyHost(S,R);
 }
 
 /* ===================== construção dos indicadores ===================== */
@@ -1164,6 +1164,27 @@ $("#bCmp").onclick=compare;
 $("#bClr").onclick=()=>{ if($("#bClr").dataset.armed){ try{localStorage.removeItem(HKEY);}catch(e){} delete $("#bClr").dataset.armed; $("#bClr").textContent="Limpar"; renderHist(); } else { $("#bClr").dataset.armed="1"; $("#bClr").textContent="Confirmar limpeza"; setTimeout(()=>{delete $("#bClr").dataset.armed; $("#bClr").textContent="Limpar";},4000);} };
 renderHist();
 $("#f").addEventListener("submit",run);
+
+/* ===================== integração com a Central de Organização ===================== */
+// Aberto dentro da Central (iframe do mesmo site): cada estudo concluído vai para a Central guardar,
+// e a Central pode reabrir um estudo guardado ou definir quem assina o relatório.
+const HOST=(()=>{ try{ return window.parent!==window && window.parent.location.origin===location.origin ? window.parent : null; }catch(e){ return null; } })();
+function notifyHost(S,R){
+  if(!HOST) return;
+  HOST.postMessage({type:"omega:estudo", estudo:{
+    address:[S.geo.road,S.geo.house].filter(Boolean).join(", ")||S.query, city:[S.geo.city,S.geo.uf].filter(Boolean).join(" - ")||null,
+    lat:S.geo.lat, lon:S.geo.lon, verdict:R.parecer.call, score:R.score.value, coverage:R.score.coverage,
+    analyzedAt:S.finished.toISOString(), state:JSON.parse(JSON.stringify(S))}}, location.origin);
+}
+if(HOST){
+  window.addEventListener("message",ev=>{
+    if(ev.source!==HOST||ev.origin!==location.origin) return;
+    const m=ev.data||{};
+    if(m.type==="omega:abrir"&&m.state){ const S=reviveS(m.state); $("#addr").value=S.query; const R=build(S); render(S,R); window.__ANALISE__={S,R}; }
+    if(m.type==="omega:config"&&m.autor) $("#autor").value=m.autor;
+  });
+  HOST.postMessage({type:"omega:pronto"},location.origin);
+}
 </script>
 </body>
 </html>

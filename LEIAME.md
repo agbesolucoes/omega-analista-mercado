@@ -52,3 +52,7 @@ A cada push no `main`, o workflow `hostinger.yml` atualiza o branch `hostinger` 
 3. Para atualizar sozinho: em **Implantação automática**, copie a URL do webhook e salve como secret `HOSTINGER_WEBHOOK` no GitHub (Settings → Secrets and variables → Actions).
 
 Alternativa manual: hPanel → Gerenciador de Arquivos → `public_html` → enviar `index.html` e `.htaccess`.
+
+## Dentro da Central de Organização
+
+O mesmo `index.html` roda embutido na tela **Mercado** da Central (repositório `agbesolucoes/tiago`, cópia em `public/analista/index.html`). Quando está num iframe do mesmo site, o analista manda cada estudo concluído para a Central (`postMessage` `omega:estudo`), aceita reabrir um estudo salvo (`omega:abrir`) e recebe o nome de quem assina (`omega:config`). Aberto sozinho, nada disso muda. Depois de alterar o analista aqui, rode `npm run analista:atualizar` na Central.
