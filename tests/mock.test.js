@@ -19,6 +19,7 @@ const off=(dm,dn)=>({lat:LAT+dm/110540, lon:LON+dn/(111320*Math.cos(LAT*Math.PI/
     if(u.includes('/t/6579/')) return J([{V:"Valor",D2C:"Variável (Código)",D3N:"Ano"},{V:"12396372",D2C:"9324",D3N:"2021"}]);
     if(u.includes('worldpop')){ const gj=JSON.parse(decodeURIComponent(u.split('geojson=')[1].split('&')[0])); const pt=gj.features[0].geometry.coordinates[0][0]; const r=(pt[1]-LAT)*110540; return J({status:"finished",error:false,data:{total_population:11000*Math.PI*(r/1000)**2}}); }
     if(u.includes('interpreter')){ const q=decodeURIComponent(r.request().postData().slice(5));
+      if(q.includes('"name"~"mega"')){ const o=off(1500,900); return J({elements:[{type:'way',id:999,center:o,tags:{leisure:'fitness_centre',name:'Omega Academia Jardins'}}]}); }
       if(q.includes('fitness_centre')){ const el=[]; for(let i=0;i<14;i++){const c=off(Math.sin(i)*200*i,Math.cos(i)*180*i); el.push({type:'node',id:100+i,lat:c.lat,lon:c.lon,tags:{leisure:'fitness_centre',name:['Smart Fit','Bodytech','Studio Pilates Ana','CrossFit Paulista','Academia Força'][i%5]+' '+i,sport:i%5===2?'pilates':i%5===3?'crossfit':'fitness',...(i%5===0?{brand:'Smart Fit'}:{}),opening_hours:i%2?'Mo-Fr 06:00-23:00':undefined,'addr:street':'Rua Teste','addr:housenumber':String(i)}});}
         const o=off(1500,900); el.push({type:'way',id:999,center:o,tags:{leisure:'fitness_centre',name:'Omega Academia Jardins'}}); return J({elements:el}); }
       if(q.includes('out count')) return J({elements:Array.from({length:10},(_,k)=>({type:'count',id:0,tags:{total:String(300+k*250)}}))});

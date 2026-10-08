@@ -397,10 +397,13 @@ async function overpassRaw(q){
 }
 const FIT_SPORT="fitness|crossfit|pilates|yoga|martial_arts|boxing|muay_thai|kickboxing|judo|karate|taekwondo|jiu-jitsu|brazilian_jiu-jitsu|capoeira|dance|gymnastics|weightlifting|functional_training|spinning|cycling|calisthenics|swimming";
 // Consultas enxutas: filtros por chave/valor exatos primeiro (rápidos no Overpass); refinamento por esporte e nome no navegador.
-function qFitness(lat,lon){const A=`(around:3000,${lat},${lon})`,O=`(around:12000,${lat},${lon})`;return `[out:json][timeout:60];
+function qFitness(lat,lon){const A=`(around:3000,${lat},${lon})`;return `[out:json][timeout:60];
 (nwr${A}["leisure"="fitness_centre"];nwr${A}["amenity"="gym"];nwr${A}["leisure"="sports_centre"];nwr${A}["sport"~"^(fitness|crossfit|pilates|yoga)$"];);
-out center tags;
-nwr${O}["leisure"="fitness_centre"]["name"~"mega",i];
+out center tags;`;}
+// Rede Omega em ~12 km: filtro por caixa (bbox), muito mais barato que "around" com raio grande; distância filtrada no navegador.
+function qOmega(lat,lon){const dl=0.11, dn=0.11/Math.cos(lat*Math.PI/180); const bb=`${(lat-dl).toFixed(4)},${(lon-dn).toFixed(4)},${(lat+dl).toFixed(4)},${(lon+dn).toFixed(4)}`;
+  return `[out:json][timeout:40];
+nwr["leisure"="fitness_centre"]["name"~"mega",i](${bb});
 out center tags;`;}
 function qContext(lat,lon){const a=r=>`(around:${r},${lat},${lon})`;
   return `[out:json][timeout:60];
@@ -496,12 +499,13 @@ async function analyse(S){
   tasks.push((async()=>{
     src("osm","run","OpenStreetMap · concorrência e entorno","Overpass API");
     try{ S.fit=(await overpass(qFitness(lat,lon))).elements; }catch(e){ S.errs.fit=e.message; }
+    try{ S.omg=(await overpass(qOmega(lat,lon))).elements; }catch(e){ S.errs.omega=e.message; }
     try{ S.ctx=(await overpass(qContext(lat,lon))).elements; }catch(e){ S.errs.ctx=e.message; }
     try{ S.bar=(await overpass(qBarriers(lat,lon))).elements; }catch(e){ S.errs.bar=e.message; }
     try{ S.cnt=(await overpass(qCounts(lat,lon))).elements; }catch(e){ S.errs.cnt=e.message; }
-    const names={fit:"concorrência",ctx:"entorno",bar:"barreiras",cnt:"contagens"};
+    const names={fit:"concorrência",omega:"rede Omega",ctx:"entorno",bar:"barreiras",cnt:"contagens"};
     const fails=Object.keys(names).filter(k=>S.errs[k]);
-    src("osm",fails.length===4?"err":"ok","OpenStreetMap · concorrência e entorno",fails.length?`falharam: ${fails.map(k=>names[k]).join(", ")} (${S.errs[fails[0]]}). Tente de novo em alguns minutos.`:"4 consultas concluídas");
+    src("osm",fails.length===5?"err":"ok","OpenStreetMap · concorrência e entorno",fails.length?`falharam: ${fails.map(k=>names[k]).join(", ")} (${S.errs[fails[0]]}). Tente de novo em alguns minutos.`:"5 consultas concluídas");
   })());
   await Promise.all(tasks);
   S.finished=NOW();
@@ -515,12 +519,12 @@ function build(S){
   const {lat,lon}=S.geo; const R={};
   // concorrência
   const seen=new Set(); R.comp=[]; R.omega=[];
-  (S.fit||[]).forEach(e=>{const c=center(e); if(!c) return; const t=e.tags||{}; const id=e.type+"/"+e.id; if(seen.has(id)) return; seen.add(id);
+  [...(S.fit||[]),...(S.omg||[])].forEach(e=>{const c=center(e); if(!c) return; const t=e.tags||{}; const id=e.type+"/"+e.id; if(seen.has(id)) return; seen.add(id);
     if(t.leisure==="sports_centre" && !isOmega(t) && !new RegExp(FIT_SPORT,"i").test(t.sport||"") && !/academia|fitness|gym|studio|est[uú]dio|crossfit|pilates|muscula/i.test(t.name||"")) return;
     const d=hav(lat,lon,c.lat,c.lon); const row={id,name:t.name||"(sem nome no mapa)",lat:c.lat,lon:c.lon,d,seg:segment(t),
       addr:[t["addr:street"],t["addr:housenumber"]].filter(Boolean).join(", ")||"não verificado", hours:t.opening_hours||"não verificado",
       site:t.website||t["contact:website"]||t["contact:instagram"]||"", phone:t.phone||t["contact:phone"]||"", tags:t};
-    if(isOmega(t)) R.omega.push(row); else if(d<=3000) R.comp.push(row);});
+    if(isOmega(t)) { if(d<=12000) R.omega.push(row); } else if(d<=3000) R.comp.push(row);});
   R.comp.sort((a,b)=>a.d-b.d); R.omega.sort((a,b)=>a.d-b.d);
   const within=(arr,r)=>arr.filter(x=>x.d<=r).length;
   R.compR={r500:within(R.comp,500),r1000:within(R.comp,1000),r2000:within(R.comp,2000),r3000:R.comp.length};
@@ -603,7 +607,7 @@ function score(S,R){
   const I=S.inputs; if(I.area&&I.areaMin){const r=I.area/I.areaMin; s.imo={v:r<0.8?1:r<1?2:r<=1.2?3:4, why:`${nf(I.area)} m² informados frente a ${nf(I.areaMin)} m² do formato (razão ${nf(r,2)}).`, imped:r<0.8};}
   const bS=R.fin.ok&&R.fin.scen?.find(x=>x.n==="Base");
   if(bS&&R.fin.be&&bS.alunos>0){const x=R.fin.be/bS.alunos; s.eco={v:x>1?1:x>0.85?2:x>0.7?3:x>0.5?4:5, why:`Equilíbrio em ${nf(Math.ceil(R.fin.be))} alunos frente a ${nf(bS.alunos)} no cenário base (razão ${nf(x,2)}).`};}
-  if(!S.errs.fit){const o=R.omega[0]; const d=o?o.d:Infinity; s.exp={v:d<1000?1:d<2000?2:d<3000?3:4, why:o?`Omega mais próxima mapeada: ${o.name}, a ${nf(d/1000,1)} km.`:"Nenhuma unidade Omega mapeada em 3 km."};}
+  if(!S.errs.fit && !S.errs.omega){const o=R.omega[0]; const d=o?o.d:Infinity; s.exp={v:d<1000?1:d<2000?2:d<3000?3:4, why:o?`Omega mais próxima mapeada: ${o.name}, a ${nf(d/1000,1)} km.`:"Nenhuma unidade Omega mapeada em 3 km."};}
   let wsum=0,acc=0; Object.keys(CRIT).forEach(k=>{if(s[k]){wsum+=CRIT[k].w; acc+=CRIT[k].w*s[k].v;}});
   return {items:s, coverage:wsum/100, value: wsum? acc/wsum : null};
 }
@@ -915,7 +919,7 @@ function buildDoc(S,R){
 
   /* 8. Canibalização */
   H1("canibal","Rede Omega e canibalização");
-  if(S.errs.fit) Pp("Indisponível nesta consulta.");
+  if(S.errs.omega) Pp("Busca da rede Omega indisponível nesta consulta.");
   else if(R.omega.length) { Tb(["Unidade Omega mapeada","Distância"],R.omega.slice(0,8).map(o=>[o.name,nf(o.d/1000,1)+" km"]),{widths:["*",80],num:[1]}); SrcL("osm"); }
   else Pp("Nenhuma unidade Omega mapeada no OpenStreetMap em 12 km.");
   Pp("O mapa público pode não listar todas as unidades. Confirme com a lista oficial, a origem (CEP) dos alunos das unidades vizinhas e a regra territorial vigente. Não há base para estimar canibalização exata; a receita incremental para a rede pode ser menor que a receita da nova unidade.");
@@ -1081,6 +1085,7 @@ async function makePdf(doc,filename){
 function render(S,R){
   $("#intro").hidden=true; const el=$("#report"); el.hidden=false;
   const doc=buildDoc(S,R); window.__DOC__=doc;
+  if(map){ map.remove(); map=null; }
   el.innerHTML=docHTML(doc);
   drawMap(S,R);
   const fname=ext=>`estudo-mercado-omega-${slugAddr(S)}.${ext}`;
@@ -1098,7 +1103,7 @@ function download(name,data,type){const a=document.createElement("a");a.href=URL
 function drawMap(S,R){
   if(typeof L==="undefined"){ $("#map").innerHTML='<p class="note" style="padding:12px">Mapa indisponível (biblioteca não carregou).</p>'; return; }
   if(map){ map.remove(); map=null; }
-  const {lat,lon}=S.geo; map=L.map("map",{scrollWheelZoom:false}).setView([lat,lon],14);
+  const {lat,lon}=S.geo; map=L.map("map",{scrollWheelZoom:false,zoomAnimation:false,fadeAnimation:false}).setView([lat,lon],14);
   L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",{maxZoom:19,subdomains:"abcd",attribution:"© OpenStreetMap · © CARTO"}).addTo(map);
   const acc=getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()||"#1c48c9";
   [500,1000,2000].forEach(r=>L.circle([lat,lon],{radius:r,color:acc,weight:1.5,fill:r===500,fillOpacity:.06,dashArray:r===2000?null:"4 4"}).addTo(map));
@@ -1107,7 +1112,7 @@ function drawMap(S,R){
   R.omega.forEach(c=>dot(c,"#f2b705",8).bindPopup(`<b>${esc(c.name)}</b><br>Omega · ${nf(c.d/1000,1)} km`).addTo(map));
   R.poi.filter(p=>p.k==="Estações (trem/metrô)").forEach(p=>dot(p,"#2a9d8f",5).bindPopup(esc(p.name||"Estação")).addTo(map));
   L.circleMarker([lat,lon],{radius:9,color:"#fff",weight:2,fillColor:acc,fillOpacity:1}).bindPopup("Imóvel analisado").addTo(map);
-  map.fitBounds(L.latLng(lat,lon).toBounds(4400));
+  map.fitBounds(L.latLng(lat,lon).toBounds(4400),{animate:false});
 }
 
 /* ===================== histórico e comparação ===================== */
@@ -1152,6 +1157,7 @@ function compare(){
   ${row("Resultado/mês, cenário base",i=>{const b=base(i); return b?brl(b.res):"—";})}
   ${row("Data da consulta",i=>esc(fmtDate(i.S.finished)))}
   </tbody></table></div><p class="note">Clique em uma análise salva para reabrir o relatório completo.</p></section>`;
+  if(map){ map.remove(); map=null; }
   $("#intro").hidden=true; const el=$("#report"); el.hidden=false; el.innerHTML=h; el.scrollIntoView({behavior:"smooth",block:"start"});
 }
 $("#bCmp").onclick=compare;
