@@ -13,10 +13,10 @@ const ADDRS = (process.env.SMOKE_ADDRS || 'Avenida Paulista, 1578, São Paulo - 
     await p.fill('#addr', addr); await p.check('#nocache'); await p.click('#go');
     try { await p.waitForFunction(() => window.__ANALISE__ || document.querySelector('#report .callout.bad'), null, { timeout: 300000 }); }
     catch (e) { failures.push(`${addr}: análise não terminou`); }
-    // O Overpass rejeita picos de uso vindos dos IPs compartilhados do GitHub: uma segunda tentativa após 60 s.
+    // O Overpass rejeita picos de uso vindos dos IPs compartilhados do GitHub: uma segunda tentativa após 90 s.
     if (await p.evaluate(() => !!(window.__ANALISE__ && (__ANALISE__.S.errs.fit || __ANALISE__.S.errs.ctx)))) {
-      console.log(`${addr}: OpenStreetMap falhou na primeira tentativa, repetindo em 60 s`);
-      await new Promise(res => setTimeout(res, 60000));
+      console.log(`${addr}: OpenStreetMap falhou na primeira tentativa, repetindo em 90 s`);
+      await new Promise(res => setTimeout(res, 90000));
       await p.evaluate(() => { window.__ANALISE__ = null; });
       await p.uncheck('#nocache'); await p.click('#bRetry');
       await p.waitForFunction(() => window.__ANALISE__, null, { timeout: 300000 }).catch(() => {});
@@ -34,7 +34,7 @@ const ADDRS = (process.env.SMOKE_ADDRS || 'Avenida Paulista, 1578, São Paulo - 
     if (r.errs.ctx) failures.push(`${addr}: OpenStreetMap entorno falhou (${r.errs.ctx})`);
     // Fontes auxiliares: registradas, mas não derrubam o teste.
     ['wp', 'idade', 'pib', 'bar', 'cnt'].forEach(k => r.errs[k] && console.log(`AVISO ${addr}: ${k} falhou: ${r.errs[k]}`));
-    await p.close(); await new Promise(res => setTimeout(res, 5000)); // respeita limites das APIs
+    await p.close(); await new Promise(res => setTimeout(res, 90000)); // o Overpass limita consultas seguidas do mesmo IP
   }
   fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
