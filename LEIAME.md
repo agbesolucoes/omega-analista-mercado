@@ -42,3 +42,13 @@ O relatório segue a estrutura executiva: capa, sumário, resumo executivo (pare
 - `npm test`: teste offline com todas as APIs simuladas (sem internet).
 - `npm run smoke`: teste com as APIs reais em dois endereços; falha se IBGE ou OpenStreetMap não responderem.
 - GitHub Actions: `testes.yml` roda os dois testes a cada push e toda segunda-feira; `pages.yml` publica o site no GitHub Pages a cada push na `main` (ativar em Settings → Pages → Source: GitHub Actions).
+
+## Hospedagem na Hostinger
+
+A cada push no `main`, o workflow `hostinger.yml` atualiza o branch `hostinger` só com `index.html`, `LEIAME.md` e `.htaccess` (HTTPS forçado, sem listagem de pastas, sem cache do HTML).
+
+1. hPanel → Sites → (seu domínio) → Avançado → **Git**. Repositório `https://github.com/agbesolucoes/omega-analista-mercado.git`, branch `hostinger`, diretório em branco (instala em `public_html`, que precisa estar vazio; para um subdomínio, crie o subdomínio antes e escolha-o).
+2. Clique em **Implantar**.
+3. Para atualizar sozinho: em **Implantação automática**, copie a URL do webhook e salve como secret `HOSTINGER_WEBHOOK` no GitHub (Settings → Secrets and variables → Actions).
+
+Alternativa manual: hPanel → Gerenciador de Arquivos → `public_html` → enviar `index.html` e `.htaccess`.

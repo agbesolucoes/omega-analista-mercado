@@ -1,0 +1,35 @@
+name: Preparar versão para a Hostinger
+# Mantém o branch "hostinger" só com os arquivos do site (sem testes nem package.json),
+# para o deploy via Git do hPanel puxar direto para public_html.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: hostinger
+  cancel-in-progress: true
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    env:
+      HOOK: ${{ secrets.HOSTINGER_WEBHOOK }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Montar pasta do site
+        run: |
+          mkdir _site
+          cp index.html LEIAME.md hostinger/.htaccess _site/
+      - name: Atualizar branch hostinger
+        run: |
+          cd _site
+          git init -q -b hostinger
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Site gerado de ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" hostinger
+      - name: Avisar a Hostinger (opcional)
+        if: env.HOOK != ''
+        run: curl -fsS -X POST "$HOOK"
