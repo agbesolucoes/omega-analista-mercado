@@ -8,7 +8,9 @@ const off=(dm,dn)=>({lat:LAT+dm/110540, lon:LON+dn/(111320*Math.cos(LAT*Math.PI/
   const b=await chromium.launch(); const p=await b.newPage({viewport:{width:1300,height:900}});
   const errs=[]; p.on('pageerror',e=>errs.push(e.message)); p.on('console',m=>{if(m.type()==='error'||m.type()==='warning')errs.push('console: '+m.text())});
   await p.route('**/*', async r=>{
-    const u=r.request().url(); if(u.startsWith('file:')) return r.continue(); const J=o=>r.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(o)});
+    const u=r.request().url(); if(u.startsWith('file:')) return r.continue();
+    const lib=[['pdfmake/0.2.10/pdfmake.min.js','pdfmake/build/pdfmake.min.js'],['pdfmake/0.2.10/vfs_fonts.js','pdfmake/build/vfs_fonts.js'],['leaflet/1.9.4/leaflet.min.js','leaflet/dist/leaflet.js']].find(([k])=>u.includes(k));
+    if(lib) return r.fulfill({status:200,contentType:'application/javascript',body:require('fs').readFileSync(require.resolve(lib[1]))}); const J=o=>r.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(o)});
     if(u.includes('nominatim')) return J([{lat:String(LAT),lon:String(LON),display_name:"Avenida Paulista, 1000, Bela Vista, São Paulo, SP",address:{house_number:"1000",road:"Avenida Paulista",suburb:"Bela Vista",city:"São Paulo",state:"São Paulo","ISO3166-2-lvl4":"BR-SP",postcode:"01310-100"}},{lat:"-23.56",lon:"-46.65",display_name:"Alternativa",address:{road:"Av Paulista",city:"São Paulo","ISO3166-2-lvl4":"BR-SP"}}]);
     if(u.includes('localidades/estados/SP')) return J([{id:3550308,nome:"São Paulo"},{id:3509502,nome:"Campinas"}]);
     if(u.includes('/t/4714/')) return J([{NC:"Nível",V:"Valor",D1C:"Município (Código)",D2N:"Variável",D2C:"Variável (Código)",D3N:"Ano",MN:"Unidade de Medida"},{V:"11451999",D2C:"93",D2N:"População residente",D3N:"2022",MN:"Pessoas"},{V:"1521.202",D2C:"6318",D3N:"2022"},{V:"7528.26",D2C:"614",D3N:"2022"}]);
@@ -31,18 +33,25 @@ const off=(dm,dn)=>({lat:LAT+dm/110540, lon:LON+dn/(111320*Math.cos(LAT*Math.PI/
   await p.click('#opt summary');
   for(const [k,v] of Object.entries({area:900,areaMin:800,aluguel:45000,fixos:80000,ticket:149,margem:70,invest:2500000,cap:3000})) await p.fill('#'+k,String(v));
   await p.click('#go');
-  await p.waitForSelector('#sec-parecer',{timeout:20000});
+  await p.waitForSelector('#s-resumo',{timeout:20000});
   await p.screenshot({path:OUT+'/shot1.png',fullPage:true});
+  // PDF executivo
+  const [dl]=await Promise.all([p.waitForEvent('download',{timeout:60000}),p.click('#bPdf')]);
+  const pdfPath=OUT+'/relatorio.pdf'; await dl.saveAs(pdfPath);
+  const pdfBuf=require('fs').readFileSync(pdfPath); const pages=(pdfBuf.toString('latin1').match(/\/Type\s*\/Page[^s]/g)||[]).length;
+  console.log('pdf bytes',pdfBuf.length,'pages',pages);
+  assert.ok(pdfBuf.slice(0,4).toString()==='%PDF' && pages>=8,'PDF executivo gerado');
   // segunda análise (com cache) e comparação
   await p.fill('#aluguel','90000'); await p.click('#go'); await p.waitForFunction(()=>document.querySelectorAll('.hitem').length===2,{timeout:20000});
   console.log('cache note:', await p.evaluate(()=>__ANALISE__.S.cache));
   await p.check('.hitem:nth-child(1) input'); await p.check('.hitem:nth-child(2) input'); await p.click('#bCmp');
   console.log('compare rows:', await p.evaluate(()=>document.querySelectorAll('#report tbody tr').length));
   await p.screenshot({path:OUT+'/cmp.png'});
-  await p.click('.hitem:nth-child(2) button'); await p.waitForSelector('#sec-parecer');
+  await p.click('.hitem:nth-child(2) button'); await p.waitForSelector('#s-resumo');
   await p.setViewportSize({width:400,height:900}); await p.emulateMedia({colorScheme:'dark'});
   await p.screenshot({path:OUT+'/shot2.png',fullPage:false});
-  const sw=await p.evaluate(()=>document.documentElement.scrollWidth); console.log('scrollWidth@400',sw);
+  const sw=await p.evaluate(()=>document.documentElement.scrollWidth);
+  if(sw>400) console.log('LARGOS',await p.evaluate(()=>[...document.querySelectorAll('body *')].filter(e=>{const r=e.getBoundingClientRect();return r.right>402&&true}).filter(e=>!e.parentElement||e.parentElement.getBoundingClientRect().right<=402).slice(0,8).map(e=>e.tagName+'.'+e.className+' '+Math.round(e.getBoundingClientRect().right)))); console.log('scrollWidth@400',sw);
   console.log(await p.evaluate(()=>JSON.stringify({call:__ANALISE__.R.parecer, score:__ANALISE__.R.score, fin:{be:__ANALISE__.R.fin.be, scen:__ANALISE__.R.fin.scen.map(s=>[s.n,Math.round(s.alunos),Math.round(s.res),s.pay])}, mun:__ANALISE__.S.mun, errs:__ANALISE__.S.errs})));
   const pageErrs=errs.filter(e=>!e.startsWith('console: Failed to load resource'));
   console.log('ERRS',pageErrs);

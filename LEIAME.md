@@ -6,11 +6,13 @@ Aplicativo de página única (`index.html`) que gera o estudo preliminar de uma 
 1. Baixe `index.html` e abra no Chrome, Edge ou Firefox (duplo clique). Precisa de internet; não precisa instalar nada.
 2. Digite o endereço com número, cidade e UF (ou coordenadas `-23.5613, -46.6565`) e clique em **Analisar região**.
 3. Opcional: abra **Dados do imóvel e do negócio** e informe área, aluguel, custos fixos, ticket, margem, investimento e capacidade para liberar os cenários financeiros, o ponto de equilíbrio e o payback.
-4. Exporte com **Baixar .md** (para colar no GPT Artur ou arquivar) ou **Baixar dados .json**.
+4. Use **Baixar PDF executivo** para o relatório A4 (capa, sumário com páginas, 12 seções, gráficos, SWOT e apêndices), **Baixar .md** para colar no GPT Artur, ou **Dados .json**. Se alguma fonte falhar, **Refazer consultas** tenta de novo só o que faltou.
 5. Cada análise fica salva no navegador (até 15). Clique para reabrir, ou marque de 2 a 4 e use **Comparar selecionadas** para ver os pontos lado a lado. O app avisa quando as coberturas da matriz são diferentes.
 6. Consultas pesadas ficam em cache local por 7 dias. Marque **Consultar tudo de novo** para forçar dados atualizados; o relatório informa quando algo veio do cache.
 
 ## O que o estudo traz
+O relatório segue a estrutura executiva: capa, sumário, resumo executivo (parecer e 3 a 5 conclusões), introdução e objetivos, metodologia, tamanho do mercado (TAM, SAM, SOM), território e acesso, perfil do consumidor, concorrência com matriz SWOT, canibalização, imóvel, viabilidade, matriz de decisão, conclusões e recomendações e apêndices. Cada tabela e gráfico traz fonte e data da consulta.
+
 - Parecer preliminar (avançar, avançar com condições, renegociar, manter em estudo, descartar), confiança e cobertura dos pesos.
 - Quadro de dados com a classificação de cada número: Verificada, Informada pelo usuário, Estimada, Hipótese de cenário, Não disponível.
 - Moradores em 500 m, 1 km e 2 km e anéis sem sobreposição; estrutura etária, densidade e PIB per capita do município.
