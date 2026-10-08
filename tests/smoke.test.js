@@ -25,7 +25,7 @@ const ADDRS = (process.env.SMOKE_ADDRS || 'Avenida Paulista, 1578, São Paulo - 
     if (r.errs.fit) failures.push(`${addr}: OpenStreetMap concorrência falhou (${r.errs.fit})`);
     if (r.errs.ctx) failures.push(`${addr}: OpenStreetMap entorno falhou (${r.errs.ctx})`);
     // Fontes auxiliares: registradas, mas não derrubam o teste.
-    ['wp', 'idade', 'pib', 'bar'].forEach(k => r.errs[k] && console.log(`AVISO ${addr}: ${k} falhou: ${r.errs[k]}`));
+    ['wp', 'idade', 'pib', 'bar', 'cnt'].forEach(k => r.errs[k] && console.log(`AVISO ${addr}: ${k} falhou: ${r.errs[k]}`));
     await p.close(); await new Promise(res => setTimeout(res, 5000)); // respeita limites das APIs
   }
   fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(report, null, 2));

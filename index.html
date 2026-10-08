@@ -363,18 +363,22 @@ async function overpassRaw(q){
   throw last;
 }
 const FIT_SPORT="fitness|crossfit|pilates|yoga|martial_arts|boxing|muay_thai|kickboxing|judo|karate|taekwondo|jiu-jitsu|brazilian_jiu-jitsu|capoeira|dance|gymnastics|weightlifting|functional_training|spinning|cycling|calisthenics|swimming";
-function qFitness(lat,lon){const A=`(around:3000,${lat},${lon})`,O=`(around:12000,${lat},${lon})`;return `[out:json][timeout:90];
-(nwr${A}["leisure"="fitness_centre"];nwr${A}["amenity"="gym"];nwr${A}["leisure"="sports_centre"]["sport"~"${FIT_SPORT}"];nwr${A}["sport"~"^(fitness|crossfit|pilates|yoga|weightlifting|martial_arts|boxing|muay_thai|functional_training)$"]["name"];nwr${A}["shop"="fitness"]["name"~"academia",i];
- nwr${O}["name"~"[OoÔô]mega",i]["leisure"~"fitness_centre|sports_centre"];nwr${O}["brand"~"[OoÔô]mega",i]["leisure"];nwr${O}["name"~"academia.*[OoÔô]mega|[OoÔô]mega.*academia",i];);
-out center tags;`;}
-function qContext(lat,lon){const a=r=>`(around:${r},${lat},${lon})`;let cnt="";
-  [500,1000,2000].forEach(r=>{cnt+=`nwr${a(r)}["shop"];out count;nwr${a(r)}["office"];out count;way${a(r)}["building"];out count;way${a(r)}["building"="apartments"];out count;way${a(r)}["building"~"^(house|residential|detached|terrace|semidetached_house)$"];out count;`;});
-  return `[out:json][timeout:120];
-(nwr${a(2000)}["amenity"~"^(school|university|college|kindergarten)$"];nwr${a(2000)}["shop"~"^(supermarket|mall|department_store)$"];nwr${a(2000)}["amenity"~"^(hospital|clinic)$"];nwr${a(2000)}["leisure"="park"];nwr${a(2000)}["railway"~"^(station|halt)$"];nwr${a(2000)}["station"="subway"];node${a(2000)}["highway"="bus_stop"];node${a(2000)}["public_transport"="platform"]["bus"="yes"];);
+// Consultas enxutas: filtros por chave/valor exatos primeiro (rápidos no Overpass); refinamento por esporte e nome no navegador.
+function qFitness(lat,lon){const A=`(around:3000,${lat},${lon})`,O=`(around:12000,${lat},${lon})`;return `[out:json][timeout:60];
+(nwr${A}["leisure"="fitness_centre"];nwr${A}["amenity"="gym"];nwr${A}["leisure"="sports_centre"];nwr${A}["sport"~"^(fitness|crossfit|pilates|yoga)$"];);
 out center tags;
-${cnt}`;}
+nwr${O}["leisure"="fitness_centre"]["name"~"mega",i];
+out center tags;`;}
+function qContext(lat,lon){const a=r=>`(around:${r},${lat},${lon})`;
+  return `[out:json][timeout:60];
+(nwr${a(2000)}["amenity"~"^(school|university|college|kindergarten)$"];nwr${a(2000)}["shop"~"^(supermarket|mall|department_store)$"];nwr${a(2000)}["amenity"~"^(hospital|clinic)$"];nwr${a(2000)}["leisure"="park"];nwr${a(2000)}["railway"~"^(station|halt)$"];nwr${a(2000)}["station"="subway"];node${a(2000)}["highway"="bus_stop"];);
+out center tags;`;}
+// Contagens: comércio e escritórios em 3 raios; edificações (consulta pesada) só em 500 m e 1 km.
+const CNT_ORDER=[["shop",500],["shop",1000],["shop",2000],["office",500],["office",1000],["office",2000],["building",500],["building",1000],["apartments",500],["apartments",1000]];
+function qCounts(lat,lon){const a=r=>`(around:${r},${lat},${lon})`; const f={shop:r=>`nwr${a(r)}["shop"]`,office:r=>`nwr${a(r)}["office"]`,building:r=>`way${a(r)}["building"]`,apartments:r=>`way${a(r)}["building"="apartments"]`};
+  return `[out:json][timeout:60];\n`+CNT_ORDER.map(([k,r])=>f[k](r)+";out count;").join("\n");}
 function qBarriers(lat,lon){const dl=0.022, dn=0.022/Math.cos(lat*Math.PI/180);const bb=`${(lat-dl).toFixed(5)},${(lon-dn).toFixed(5)},${(lat+dl).toFixed(5)},${(lon+dn).toFixed(5)}`;const a=r=>`(around:${r},${lat},${lon})`;
-  return `[out:json][timeout:90];
+  return `[out:json][timeout:60];
 way${a(2000)}["highway"~"^(motorway|trunk)$"];out tags geom(${bb});
 way${a(2000)}["railway"~"^(rail|subway|light_rail)$"]["tunnel"!="yes"];out tags geom(${bb});
 way${a(2000)}["waterway"~"^(river|canal)$"];out tags geom(${bb});
@@ -440,8 +444,11 @@ async function analyse(S){
       try{
         const pib=(await ibgeVars(5938,[37],"last",mun.id))[0];
         if(pib){ S.mun.pib={value:pib.value*1000, year:pib.year};
-          let popY=null; if(String(pib.year)==="2022") popY=S.mun.pop; else { try{ popY=(await ibgeVars(6579,[9324],String(pib.year),mun.id))[0]?.value; }catch(e){} }
-          if(popY) S.mun.pibpc={value:pib.value*1000/popY, year:pib.year}; }
+          let popY=null, popNote="";
+          if(String(pib.year)==="2022") { popY=S.mun.pop; popNote="Censo 2022"; }
+          else { try{ const e=(await ibgeVars(6579,[9324],String(pib.year),mun.id))[0]; if(e){popY=e.value; popNote="estimativa "+e.year;} }catch(e){} }
+          if(!popY && S.mun.pop){ popY=S.mun.pop; popNote="Censo 2022 (ano diferente do PIB)"; }
+          if(popY) S.mun.pibpc={value:pib.value*1000/popY, year:pib.year, popNote}; }
       }catch(e){ S.errs.pib=e.message; }
       src("ibge","ok","IBGE · município e Censo 2022",`${mun.nome} (${mun.id})${S.errs.idade?" · idade indisponível":""}${S.errs.pib?" · PIB indisponível":""}`);
     }catch(e){ S.errs.ibge=e.message; src("ibge","err","IBGE",e.message); }
@@ -458,8 +465,10 @@ async function analyse(S){
     try{ S.fit=(await overpass(qFitness(lat,lon))).elements; }catch(e){ S.errs.fit=e.message; }
     try{ S.ctx=(await overpass(qContext(lat,lon))).elements; }catch(e){ S.errs.ctx=e.message; }
     try{ S.bar=(await overpass(qBarriers(lat,lon))).elements; }catch(e){ S.errs.bar=e.message; }
-    const fails=["fit","ctx","bar"].filter(k=>S.errs[k]);
-    src("osm",fails.length===3?"err":"ok","OpenStreetMap · concorrência e entorno",fails.length?`falharam: ${fails.join(", ")} (${S.errs[fails[0]]})`:"3 consultas concluídas");
+    try{ S.cnt=(await overpass(qCounts(lat,lon))).elements; }catch(e){ S.errs.cnt=e.message; }
+    const names={fit:"concorrência",ctx:"entorno",bar:"barreiras",cnt:"contagens"};
+    const fails=Object.keys(names).filter(k=>S.errs[k]);
+    src("osm",fails.length===4?"err":"ok","OpenStreetMap · concorrência e entorno",fails.length?`falharam: ${fails.map(k=>names[k]).join(", ")} (${S.errs[fails[0]]}). Tente de novo em alguns minutos.`:"4 consultas concluídas");
   })());
   await Promise.all(tasks);
   S.finished=NOW();
@@ -474,6 +483,7 @@ function build(S){
   // concorrência
   const seen=new Set(); R.comp=[]; R.omega=[];
   (S.fit||[]).forEach(e=>{const c=center(e); if(!c) return; const t=e.tags||{}; const id=e.type+"/"+e.id; if(seen.has(id)) return; seen.add(id);
+    if(t.leisure==="sports_centre" && !isOmega(t) && !new RegExp(FIT_SPORT,"i").test(t.sport||"") && !/academia|fitness|gym|studio|est[uú]dio|crossfit|pilates|muscula/i.test(t.name||"")) return;
     const d=hav(lat,lon,c.lat,c.lon); const row={id,name:t.name||"(sem nome no mapa)",lat:c.lat,lon:c.lon,d,seg:segment(t),
       addr:[t["addr:street"],t["addr:housenumber"]].filter(Boolean).join(", ")||"não verificado", hours:t.opening_hours||"não verificado",
       site:t.website||t["contact:website"]||t["contact:instagram"]||"", phone:t.phone||t["contact:phone"]||"", tags:t};
@@ -483,7 +493,7 @@ function build(S){
   R.compR={r500:within(R.comp,500),r1000:within(R.comp,1000),r2000:within(R.comp,2000),r3000:R.comp.length};
   R.segCount={}; R.comp.filter(x=>x.d<=2000).forEach(x=>R.segCount[x.seg]=(R.segCount[x.seg]||0)+1);
   // entorno
-  const ctx=(S.ctx||[]).filter(e=>e.type!=="count"); const counts=(S.ctx||[]).filter(e=>e.type==="count").map(e=>+e.tags.total);
+  const ctx=(S.ctx||[]).filter(e=>e.type!=="count"); const counts=(S.cnt||[]).filter(e=>e.type==="count").map(e=>+e.tags.total);
   const P=[]; const pseen=new Set();
   ctx.forEach(e=>{const c=center(e); if(!c) return; const t=e.tags||{}; const id=e.type+"/"+e.id; if(pseen.has(id)) return; pseen.add(id);
     let k=null; if(/^(school|kindergarten)$/.test(t.amenity)) k="Escolas"; else if(/^(university|college)$/.test(t.amenity)) k="Faculdades"; else if(/^(supermarket)$/.test(t.shop)) k="Supermercados";
@@ -491,7 +501,7 @@ function build(S){
     else if(t.railway||t.station==="subway") k="Estações (trem/metrô)"; else if(t.highway==="bus_stop"||t.public_transport==="platform") k="Pontos de ônibus";
     if(k) P.push({k,name:t.name||"",d:hav(lat,lon,c.lat,c.lon),lat:c.lat,lon:c.lon});});
   R.poi=P; R.poiCat={}; P.forEach(p=>{const o=R.poiCat[p.k]||(R.poiCat[p.k]={r500:0,r1000:0,r2000:0,near:null}); if(p.d<=500)o.r500++; if(p.d<=1000)o.r1000++; if(p.d<=2000)o.r2000++; if(!o.near||p.d<o.near.d)o.near=p;});
-  if(counts.length===15){const g=(r,i)=>counts[r*5+i]; R.cnt={}; ["shop","office","building","apartments","houses"].forEach((n,i)=>R.cnt[n]={r500:g(0,i),r1000:g(1,i),r2000:g(2,i)});}
+  if(counts.length===CNT_ORDER.length){R.cnt={}; CNT_ORDER.forEach(([k,r],i)=>{(R.cnt[k]=R.cnt[k]||{r500:null,r1000:null,r2000:null})["r"+r]=counts[i];});}
   // barreiras
   R.barriers=[]; R.arterial=null;
   (S.bar||[]).forEach(e=>{const t=e.tags||{}; const geom=e.geometry||[]; let dm=Infinity; for(let i=1;i<geom.length;i++){ if(!geom[i-1]||!geom[i]) continue; dm=Math.min(dm,segDist(lat,lon,geom[i-1],geom[i])); }
@@ -621,7 +631,7 @@ function render(S,R){
     ["Município", m.nome?`${m.nome} - ${m.uf} (IBGE ${m.id})`:"—", m.nome?"ver":"na", "IBGE Localidades", ""],
     ["População do município", m.pop?nf(m.pop):"—", m.pop?"ver":"na", "IBGE, Censo 2022 (tabela 4714)", "2022"],
     ["Densidade do município", m.dens?nf(m.dens,1)+" hab/km²":"—", m.dens?"ver":"na", "IBGE, Censo 2022 (tabela 4714)", "2022"],
-    ["PIB per capita do município", m.pibpc?brl(m.pibpc.value):"—", m.pibpc?"est":"na", "IBGE, PIB dos Municípios (5938) ÷ população", m.pibpc?m.pibpc.year:""],
+    ["PIB per capita do município", m.pibpc?brl(m.pibpc.value):"—", m.pibpc?"est":"na", "IBGE, PIB dos Municípios (5938) ÷ população"+(m.pibpc?` (${m.pibpc.popNote})`:""), m.pibpc?m.pibpc.year:""],
     ["Moradores em 500 m", pop?nf(roundSig(pop.r500)):"—", pop?"est":"na", "WorldPop 2020 (modelo de grade 100 m)", "2020"],
     ["Moradores em 1 km", pop?nf(roundSig(pop.r1000)):"—", pop?"est":"na", "WorldPop 2020", "2020"],
     ["Moradores em 2 km", pop?nf(roundSig(pop.r2000)):"—", pop?"est":"na", "WorldPop 2020", "2020"],
@@ -644,15 +654,14 @@ function render(S,R){
       <div class="kpi"><span class="l">Total em 2 km (sem sobreposição)</span><span class="v">${nf(roundSig(R.pop2k))}</span><span class="l">média ${nf(roundSig(R.dens2k))} hab/km²</span></div></div>`; }
   else h+=`<div class="callout">Moradores por raio indisponíveis (${esc(S.errs.wp||"")}). Não foi usada a população do bairro ou do município como substituto.</div>`;
   if(m.idade){ h+=`<h3>Estrutura etária do município ${chip("ver")}</h3><div style="display:flex;flex-direction:column;gap:6px;max-width:560px">${m.idade.bands.map(b=>`<div style="display:grid;grid-template-columns:120px 1fr 56px;gap:10px;align-items:center;font-size:.84rem"><span>${b.label}</span><div class="bar"><span style="width:${(b.s*100/0.35).toFixed(1)}%"></span></div><span class="mono" style="text-align:right">${pct(b.s)}</span></div>`).join("")}</div><p class="note">Recorte municipal (Censo 2022, tabela 9514). O perfil do entorno pode ser diferente; confirmar por setor censitário.</p>`; }
-  if(R.cnt){ const c=R.cnt; const vert=r=>c.building[r]?c.apartments[r]/c.building[r]:null;
+  if(R.cnt){ const c=R.cnt; const vert=r=>c.building[r]&&c.apartments[r]!=null?c.apartments[r]/c.building[r]:null;
     h+=`<h3>Ocupação e atividade econômica ${chip("ver")}</h3><div class="tbl"><table><thead><tr><th>Indicador (OpenStreetMap)</th><th class="n">500 m</th><th class="n">1 km</th><th class="n">2 km</th></tr></thead><tbody>
     <tr><td>Comércios mapeados</td><td class="n">${nf(c.shop.r500)}</td><td class="n">${nf(c.shop.r1000)}</td><td class="n">${nf(c.shop.r2000)}</td></tr>
     <tr><td>Escritórios mapeados</td><td class="n">${nf(c.office.r500)}</td><td class="n">${nf(c.office.r1000)}</td><td class="n">${nf(c.office.r2000)}</td></tr>
     <tr><td>Edifícios de apartamentos</td><td class="n">${nf(c.apartments.r500)}</td><td class="n">${nf(c.apartments.r1000)}</td><td class="n">${nf(c.apartments.r2000)}</td></tr>
-    <tr><td>Casas e residenciais</td><td class="n">${nf(c.houses.r500)}</td><td class="n">${nf(c.houses.r1000)}</td><td class="n">${nf(c.houses.r2000)}</td></tr>
     <tr><td>Edificações mapeadas (todas)</td><td class="n">${nf(c.building.r500)}</td><td class="n">${nf(c.building.r1000)}</td><td class="n">${nf(c.building.r2000)}</td></tr>
     <tr><td>Participação de prédios de apartamentos</td><td class="n">${pct(vert("r500"))}</td><td class="n">${pct(vert("r1000"))}</td><td class="n">${pct(vert("r2000"))}</td></tr></tbody></table></div>
-    <p class="note">Contagens dependem do que voluntários mapearam e servem para comparar raios, não como estoque oficial. Verticalização indica densidade, não poder aquisitivo.</p>`; }
+    <p class="note">Edificações não são contadas em 2 km para manter a consulta leve. Contagens dependem do que voluntários mapearam e servem para comparar raios, não como estoque oficial. Verticalização indica densidade, não poder aquisitivo.</p>`; }
   const cats=["Estações (trem/metrô)","Pontos de ônibus","Escolas","Faculdades","Supermercados","Shoppings e lojas âncora","Hospitais e clínicas","Parques e praças"];
   if(!S.errs.ctx){ h+=`<h3>Geradores de fluxo e acesso</h3><div class="tbl"><table><thead><tr><th>Categoria</th><th class="n">500 m</th><th class="n">1 km</th><th class="n">2 km</th><th>Mais próximo</th></tr></thead><tbody>
     ${cats.map(k=>{const o=R.poiCat[k]||{r500:0,r1000:0,r2000:0}; return `<tr><td>${k}</td><td class="n">${o.r500}</td><td class="n">${o.r1000}</td><td class="n">${o.r2000}</td><td>${o.near?esc((o.near.name||"sem nome")+" · "+nf(o.near.d)+" m"):"—"}</td></tr>`;}).join("")}</tbody></table></div>`; }
@@ -788,7 +797,7 @@ function toMarkdown(S,R){
   L.push(`| Academias/estúdios em 2 km | ${S.errs.fit?"—":R.compR.r2000} | ${S.errs.fit?"Não disponível":"Verificada (cobertura não comprovada)"} | OpenStreetMap |`);
   L.push(`| Renda do entorno | — | Não disponível | Censo 2022 por setor |`,`| Preços de concorrentes | não verificado | Não disponível | consulta direta |`,``);
   if(m.idade) L.push(`**Estrutura etária do município (Censo 2022):** ${m.idade.bands.map(b=>`${b.label} ${pct(b.s)}`).join("; ")}.`,``);
-  if(R.cnt) L.push(`**Entorno (OSM, 500 m / 1 km / 2 km):** comércios ${R.cnt.shop.r500}/${R.cnt.shop.r1000}/${R.cnt.shop.r2000}; escritórios ${R.cnt.office.r500}/${R.cnt.office.r1000}/${R.cnt.office.r2000}; prédios de apartamentos ${R.cnt.apartments.r500}/${R.cnt.apartments.r1000}/${R.cnt.apartments.r2000}.`,``);
+  if(R.cnt) L.push(`**Entorno (OSM, 500 m / 1 km / 2 km):** comércios ${R.cnt.shop.r500}/${R.cnt.shop.r1000}/${R.cnt.shop.r2000}; escritórios ${R.cnt.office.r500}/${R.cnt.office.r1000}/${R.cnt.office.r2000}; prédios de apartamentos ${R.cnt.apartments.r500}/${R.cnt.apartments.r1000} (500 m / 1 km).`,``);
   if(!S.errs.ctx){L.push(`**Geradores de fluxo (500 m / 1 km / 2 km):**`); Object.entries(R.poiCat).forEach(([k,o])=>L.push(`- ${k}: ${o.r500}/${o.r1000}/${o.r2000}${o.near?` · mais próximo: ${o.near.name||"sem nome"} (${nf(o.near.d)} m)`:""}`)); L.push(``);}
   if(R.barriers.length) L.push(`**Barreiras em 2 km:** ${R.barriers.slice(0,6).map(b=>`${b.kind} ${b.name} (${nf(b.d)} m)`).join("; ")}.`,``);
   L.push(`## Concorrência (OpenStreetMap, até 3 km)`,``,`| Nome | Segmento | Distância | Endereço | Preço | Horário | Fonte |`,`|---|---|---|---|---|---|---|`);

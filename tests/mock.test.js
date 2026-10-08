@@ -19,9 +19,9 @@ const off=(dm,dn)=>({lat:LAT+dm/110540, lon:LON+dn/(111320*Math.cos(LAT*Math.PI/
     if(u.includes('interpreter')){ const q=decodeURIComponent(r.request().postData().slice(5));
       if(q.includes('fitness_centre')){ const el=[]; for(let i=0;i<14;i++){const c=off(Math.sin(i)*200*i,Math.cos(i)*180*i); el.push({type:'node',id:100+i,lat:c.lat,lon:c.lon,tags:{leisure:'fitness_centre',name:['Smart Fit','Bodytech','Studio Pilates Ana','CrossFit Paulista','Academia Força'][i%5]+' '+i,sport:i%5===2?'pilates':i%5===3?'crossfit':'fitness',...(i%5===0?{brand:'Smart Fit'}:{}),opening_hours:i%2?'Mo-Fr 06:00-23:00':undefined,'addr:street':'Rua Teste','addr:housenumber':String(i)}});}
         const o=off(1500,900); el.push({type:'way',id:999,center:o,tags:{leisure:'fitness_centre',name:'Omega Academia Jardins'}}); return J({elements:el}); }
-      if(q.includes('out count')){ const el=[]; const add=(k,tags,n,maxd)=>{for(let i=0;i<n;i++){const c=off((i*137%maxd)-maxd/2,(i*71%maxd)-maxd/2); el.push({type:'node',id:k*1000+i,lat:c.lat,lon:c.lon,tags});}};
+      if(q.includes('out count')) return J({elements:Array.from({length:10},(_,k)=>({type:'count',id:0,tags:{total:String(300+k*250)}}))});
+      if(q.includes('bus_stop')){ const el=[]; const add=(k,tags,n,maxd)=>{for(let i=0;i<n;i++){const c=off((i*137%maxd)-maxd/2,(i*71%maxd)-maxd/2); el.push({type:'node',id:k*1000+i,lat:c.lat,lon:c.lon,tags});}};
         add(1,{highway:'bus_stop',name:'Ponto'},40,2600); add(2,{railway:'station',name:'Estação Trianon-Masp'},2,1200); add(3,{amenity:'school',name:'Escola X'},12,3000); add(4,{shop:'supermarket',name:'Pão de Açúcar'},6,3000); add(5,{amenity:'university',name:'FGV'},3,2000);
-        [500,1000,2000].forEach((r,i)=>[800,600,3000,900,1200].forEach(v=>el.push({type:'count',id:0,tags:{total:String(Math.round(v*(i+1)**2))}})));
         return J({elements:el}); }
       const g=n=>[off(n,-2000),off(n,2000)]; return J({elements:[{type:'way',id:1,tags:{highway:'trunk',name:'Av. 23 de Maio'},geometry:g(600)},{type:'way',id:2,tags:{highway:'primary',name:'Avenida Paulista'},geometry:g(30)},{type:'way',id:3,tags:{waterway:'river',name:'Rio Pinheiros'},geometry:g(1900)}]}); }
     return r.abort();
