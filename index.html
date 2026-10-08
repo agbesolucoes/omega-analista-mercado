@@ -158,7 +158,7 @@ table.small{font-size:.78rem}
         </label>
         <div class="grid2">
           <label for="dest">Destinatário<input id="dest" value="Diretoria de Expansão Omega Academia"></label>
-          <label for="autor">Preparado por<input id="autor" value="Artur · Inteligência de Mercado Omega"></label>
+          <label for="autor">Preparado por<input id="autor" value="Tiago Deotti"></label>
         </div>
         <details id="opt">
           <summary>Dados do imóvel e do negócio (opcional)</summary>
@@ -775,7 +775,7 @@ function buildDoc(S,R){
   const C=(text,cls)=>({text,cls});
   const addr=[g.road,g.house].filter(Boolean).join(", ")||S.query;
   const meta={title:"Estudo de Mercado para Expansão", subtitle:`Unidade Omega Academia · ${addr}${g.city?` · ${g.city}${g.uf?" - "+g.uf:""}`:""}`,
-    addrShort:addr, display:g.display, author:I.autor||"Artur · Inteligência de Mercado Omega", to:I.dest||"Diretoria de Expansão Omega Academia",
+    addrShort:addr, display:g.display, author:I.autor||"Tiago Deotti", to:I.dest||"Diretoria de Expansão Omega Academia",
     date:longDate(S.finished), coords:`${g.lat.toFixed(5)}, ${g.lon.toFixed(5)}`, call:P.call, conf:P.conf, cov:R.score.coverage, score:R.score.value};
 
   /* 1. Resumo executivo */
