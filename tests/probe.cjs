@@ -7,7 +7,7 @@ const { chromium } = require('playwright');
     await p.goto('file://' + require('path').resolve(__dirname, '../index.html'));
     await p.fill('#addr', addr); await p.check('#nocache'); await p.click('#go');
     await p.waitForFunction(() => document.querySelector('#sources')?.innerText.includes('IBGE') || document.querySelector('#report .callout.bad'), null, { timeout: 120000 }).catch(() => {});
-    await new Promise(r => setTimeout(r, 15000));
+    await new Promise(r => setTimeout(r, 20000));
     console.log('\n' + addr + '\n' + await p.evaluate(() => document.querySelector('#sources')?.innerText + '\n' + (document.querySelector('#report .callout.bad')?.innerText || '')), errs);
     await p.close();
   }
