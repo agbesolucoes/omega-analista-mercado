@@ -11,15 +11,15 @@ const ADDRS = (process.env.SMOKE_ADDRS || 'Avenida Paulista, 1578, São Paulo - 
     const errs = []; p.on('pageerror', e => errs.push(e.message));
     await p.goto('file://' + path.resolve(__dirname, '../index.html'));
     await p.fill('#addr', addr); await p.check('#nocache'); await p.click('#go');
-    try { await p.waitForFunction(() => window.__ANALISE__ || document.querySelector('#report .callout.bad'), null, { timeout: 300000 }); }
-    catch (e) { failures.push(`${addr}: análise não terminou`); }
+    try { await p.waitForFunction(() => window.__ANALISE__ || document.querySelector('#report .callout.bad'), null, { timeout: 480000 }); }
+    catch (e) { failures.push(`${addr}: análise não terminou`); console.log(addr, 'fontes no momento:', await p.evaluate(() => document.querySelector('#sources')?.innerText)); }
     // O Overpass rejeita picos de uso vindos dos IPs compartilhados do GitHub: uma segunda tentativa após 90 s.
     if (await p.evaluate(() => !!(window.__ANALISE__ && (__ANALISE__.S.errs.fit || __ANALISE__.S.errs.ctx)))) {
       console.log(`${addr}: OpenStreetMap falhou na primeira tentativa, repetindo em 90 s`);
       await new Promise(res => setTimeout(res, 90000));
       await p.evaluate(() => { window.__ANALISE__ = null; });
       await p.uncheck('#nocache'); await p.click('#bRetry');
-      await p.waitForFunction(() => window.__ANALISE__, null, { timeout: 300000 }).catch(() => {});
+      await p.waitForFunction(() => window.__ANALISE__, null, { timeout: 480000 }).catch(() => {});
     }
     const r = await p.evaluate(() => window.__ANALISE__ ? ({
       geo: __ANALISE__.S.geo, mun: __ANALISE__.S.mun && { nome: __ANALISE__.S.mun.nome, pop: __ANALISE__.S.mun.pop, idade: !!__ANALISE__.S.mun.idade, pibpc: __ANALISE__.S.mun.pibpc },
