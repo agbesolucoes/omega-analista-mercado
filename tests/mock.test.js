@@ -71,6 +71,21 @@ const off=(dm,dn)=>({lat:LAT+dm/110540, lon:LON+dn/(111320*Math.cos(LAT*Math.PI/
   console.log('crispim:',asked,g3.city,g3.mun);
   assert.strictEqual(g3.mun,3522208,'município de Itapecerica da Serra reconhecido');
   assert.ok(g3.n==='477'&&/número 477 não está no mapa/.test(g3.txt),'avisa que só a rua foi localizada');
+  // O mesmo endereço sem o estado no final: a cidade vem da lista de municípios do Brasil.
+  const p4=await b.newPage(); const asked4=[];
+  await p4.route('**/*', r=>{ const u=r.request().url();
+    if(u.includes('localidades/municipios?view=nivelado')) return r.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify([{"municipio-id":3550308,"municipio-nome":"São Paulo","UF-sigla":"SP"},{"municipio-id":3133303,"municipio-nome":"Itapecerica","UF-sigla":"MG"},{"municipio-id":3522208,"municipio-nome":"Itapecerica da Serra","UF-sigla":"SP"},{"municipio-id":5005004,"municipio-nome":"Jardim","UF-sigla":"MS"}])});
+    if(u.includes('localidades/estados/SP')) return r.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify([{id:3550308,nome:"São Paulo"},{id:3522208,nome:"Itapecerica da Serra"}])});
+    if(u.includes('nominatim')&&u.includes('/search')){ asked4.push(decodeURIComponent(u.split('&').filter(x=>/^(q|street|city|state)=/.test(x)).join('&')));
+      const ok=u.includes('street=')&&u.includes('Itapecerica');
+      return r.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(ok?[{lat:"-23.7561821",lon:"-46.8183618",display_name:"Estrada do Crispim, Mombaça, Itapecerica da Serra, São Paulo, 06867-210, Brasil",address:{road:"Estrada do Crispim",suburb:"Mombaça",city:"Itapecerica da Serra",state:"São Paulo","ISO3166-2-lvl4":"BR-SP",postcode:"06867-210"}}]:[])}); }
+    return require('./mock-apis')(r); });
+  await p4.goto('file://'+require('path').resolve(__dirname,'../index.html'));
+  await p4.fill('#addr','Estrada do Crispim, 477, Jardim Santa Júlia Itapecerica da Serra'); await p4.click('#go');
+  await p4.waitForSelector('#s-resumo',{timeout:90000});
+  const g4=await p4.evaluate(()=>({mun:__ANALISE__.S.mun?.id}));
+  console.log('sem UF:',asked4,g4.mun);
+  assert.strictEqual(g4.mun,3522208,'cidade achada sem o estado no texto');
   console.log('OK: teste simulado passou');
   await b.close();
 })();
