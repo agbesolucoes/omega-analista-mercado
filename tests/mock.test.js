@@ -56,6 +56,21 @@ const off=(dm,dn)=>({lat:LAT+dm/110540, lon:LON+dn/(111320*Math.cos(LAT*Math.PI/
   assert.strictEqual(fb.src,'dens','população pela densidade do município quando o WorldPop falha');
   assert.ok(Math.abs(fb.pop-7528.26*Math.PI*4)<1 && fb.cov===1,'reserva calculada e matriz completa');
   assert.ok(/densidade média/.test(fb.txt),'relatório avisa que a população é estimativa de reserva');
+  // Endereço que só aparece no mapa com outra grafia ("Estrada do Crispim") e com o bairro colado na cidade.
+  const p3=await b.newPage(); const asked=[];
+  await p3.route('**/*', r=>{ const u=r.request().url();
+    if(u.includes('localidades/estados/SP')) return r.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify([{id:3550308,nome:"São Paulo"},{id:3522208,nome:"Itapecerica da Serra"}])});
+    if(u.includes('nominatim')&&u.includes('/search')){ asked.push(decodeURIComponent(u.split('&').filter(x=>/^(q|street|city)=/.test(x)).join('&')));
+      const ok=u.includes('street=')&&u.includes('Itapecerica');
+      return r.fulfill({status:200,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(ok?[{lat:"-23.7561821",lon:"-46.8183618",display_name:"Estrada do Crispim, Mombaça, Itapecerica da Serra, São Paulo, 06867-210, Brasil",address:{road:"Estrada do Crispim",suburb:"Mombaça",city:"Itapecerica da Serra",state:"São Paulo","ISO3166-2-lvl4":"BR-SP",postcode:"06867-210"}}]:[])}); }
+    return require('./mock-apis')(r); });
+  await p3.goto('file://'+require('path').resolve(__dirname,'../index.html'));
+  await p3.fill('#addr','Estrada Crispim, 477, Jardim Santa Júlia Itapecerica da Serra, São Paulo, SP'); await p3.click('#go');
+  await p3.waitForSelector('#s-resumo',{timeout:90000});
+  const g3=await p3.evaluate(()=>({city:__ANALISE__.S.geo.city,mun:__ANALISE__.S.mun?.id,n:__ANALISE__.S.geo.numberAsked,txt:document.querySelector('#report').innerText}));
+  console.log('crispim:',asked,g3.city,g3.mun);
+  assert.strictEqual(g3.mun,3522208,'município de Itapecerica da Serra reconhecido');
+  assert.ok(g3.n==='477'&&/número 477 não está no mapa/.test(g3.txt),'avisa que só a rua foi localizada');
   console.log('OK: teste simulado passou');
   await b.close();
 })();
