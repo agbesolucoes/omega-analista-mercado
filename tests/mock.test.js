@@ -35,11 +35,15 @@ const off=(dm,dn)=>({lat:LAT+dm/110540, lon:LON+dn/(111320*Math.cos(LAT*Math.PI/
   console.log(await p.evaluate(()=>JSON.stringify({call:__ANALISE__.R.parecer, score:__ANALISE__.R.score, fin:{be:__ANALISE__.R.fin.be, scen:__ANALISE__.R.fin.scen.map(s=>[s.n,Math.round(s.alunos),Math.round(s.res),s.pay])}, mun:__ANALISE__.S.mun, errs:__ANALISE__.S.errs})));
   const pageErrs=errs.filter(e=>!e.startsWith('console: Failed to load resource'));
   console.log('ERRS',pageErrs);
-  const res=await p.evaluate(()=>({call:__ANALISE__.R.parecer.call,cov:__ANALISE__.R.score.coverage,comp:__ANALISE__.R.compR.r2000,omega:__ANALISE__.R.omega.length,pop:__ANALISE__.R.pop2k}));
+  const res=await p.evaluate(()=>({call:__ANALISE__.R.parecer.call,cov:__ANALISE__.R.score.coverage,comp:__ANALISE__.R.compR.r2000,omega:__ANALISE__.R.omega.length,pop:__ANALISE__.R.pop2k,pod:__ANALISE__.R.score.items.pod,renda:__ANALISE__.R.power.renda,names:__ANALISE__.R.comp.map(c=>c.name)}));
   assert.strictEqual(pageErrs.length,0,'erros de JavaScript na página');
   assert.strictEqual(sw,400,'rolagem horizontal no celular');
   assert.strictEqual(res.cov,1,'cobertura deveria ser 100% com todos os dados');
   assert.ok(res.comp>0&&res.omega===1&&res.pop>100000,'indicadores calculados');
+  assert.ok(res.pod&&res.pod.v===4&&res.renda.media>2700,'poder de compra pela renda do Censo 2022');
+  assert.ok(res.names.includes('Academia do Bairro')&&res.names.includes('Studio Pilates Vida')&&!res.names.includes('Academia ao Ar Livre'),'busca de concorrentes pelo nome');
+  const txt=await p.evaluate(()=>document.querySelector('#report').innerText);
+  assert.ok(/Poder de compra/.test(txt)&&/Renda domiciliar per capita média/.test(txt),'seção de poder de compra no relatório');
   console.log('OK: teste simulado passou');
   await b.close();
 })();

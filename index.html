@@ -395,6 +395,8 @@ async function ibgeIdadeRaw(munId){
 function circleRing(lat,lon,r,n=48){const pts=[];for(let i=0;i<=n;i++){const t=2*Math.PI*i/n;const dy=r*Math.cos(t)/110540, dx=r*Math.sin(t)/(111320*Math.cos(lat*Math.PI/180));pts.push([+(lon+dx).toFixed(6),+(lat+dy).toFixed(6)]);}return pts;}
 const worldpop=(lat,lon,r)=>cached(`wp|${lat.toFixed(4)}|${lon.toFixed(4)}|${r}`,"WorldPop",()=>worldpopRaw(lat,lon,r));
 async function worldpopRaw(lat,lon,r){
+  // Dentro da Central, o servidor dela consulta o WorldPop (o navegador não consegue ler a resposta atual).
+  if(HOST){ try{ const j=await fetchJSON(`/api/market-studies/population?lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}&r=${r}`,{credentials:"same-origin"},150000,1); if(isFinite(j.total)) return j.total; }catch(e){ console.warn("WorldPop pela Central falhou",e.message); } }
   const gj={type:"FeatureCollection",features:[{type:"Feature",properties:{},geometry:{type:"Polygon",coordinates:[circleRing(lat,lon,r)]}}]};
   let j=await fetchJSON(`https://api.worldpop.org/v1/services/stats?dataset=wpgppop&year=2020&geojson=${encodeURIComponent(JSON.stringify(gj))}&runasync=false`,{},90000);
   for(let i=0;i<30 && j && j.status!=="finished" && j.taskid;i++){ await sleep(3000); j=await fetchJSON(`https://api.worldpop.org/v1/tasks/${j.taskid}`); if(j.error) throw new Error(j.error_message||"erro WorldPop"); }
