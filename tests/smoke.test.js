@@ -23,17 +23,19 @@ const ADDRS = (process.env.SMOKE_ADDRS || 'Avenida Paulista, 1578, São Paulo - 
     }
     const r = await p.evaluate(() => window.__ANALISE__ ? ({
       geo: __ANALISE__.S.geo, mun: __ANALISE__.S.mun && { nome: __ANALISE__.S.mun.nome, pop: __ANALISE__.S.mun.pop, idade: !!__ANALISE__.S.mun.idade, pibpc: __ANALISE__.S.mun.pibpc },
-      errs: __ANALISE__.S.errs, pop: __ANALISE__.S.pop, comp: __ANALISE__.R.compR, omega: __ANALISE__.R.omega.map(o => o.name),
+      errs: __ANALISE__.S.errs, pop: __ANALISE__.S.pop, pop2k: __ANALISE__.R.pop2k, popSrc: __ANALISE__.R.popSrc, power: __ANALISE__.R.power, comp: __ANALISE__.R.compR, omega: __ANALISE__.R.omega.map(o => o.name),
       parecer: __ANALISE__.R.parecer.call, score: __ANALISE__.R.score }) : null);
     await p.screenshot({ path: path.join(OUT, addr.replace(/[^a-z0-9]+/gi, '_') + '.png'), fullPage: true });
     report.push({ addr, r, pageErrors: errs });
     if (!r) { failures.push(`${addr}: endereço não localizado`); continue; }
     if (errs.length) failures.push(`${addr}: erro de JavaScript: ${errs[0]}`);
     if (!r.mun || !r.mun.pop) failures.push(`${addr}: IBGE sem população (${r.errs.ibge || ''})`);
+    if (!r.pop2k) failures.push(`${addr}: sem moradores em 2 km (${r.errs.wp || ''})`);
+    if (!r.score.items.pod) failures.push(`${addr}: sem poder de compra (${r.errs.renda || ''} ${r.errs.sal || ''})`);
     if (r.errs.fit) failures.push(`${addr}: OpenStreetMap concorrência falhou (${r.errs.fit})`);
     if (r.errs.ctx) failures.push(`${addr}: OpenStreetMap entorno falhou (${r.errs.ctx})`);
     // Fontes auxiliares: registradas, mas não derrubam o teste.
-    ['wp', 'idade', 'pib', 'bar', 'cnt'].forEach(k => r.errs[k] && console.log(`AVISO ${addr}: ${k} falhou: ${r.errs[k]}`));
+    ['wp', 'idade', 'pib', 'renda', 'sal', 'fitName', 'bar', 'cnt'].forEach(k => r.errs[k] && console.log(`AVISO ${addr}: ${k} falhou: ${r.errs[k]}`));
     await p.close(); await new Promise(res => setTimeout(res, 90000)); // o Overpass limita consultas seguidas do mesmo IP
   }
   fs.writeFileSync(path.join(OUT, 'smoke.json'), JSON.stringify(report, null, 2));

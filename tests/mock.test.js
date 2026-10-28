@@ -44,6 +44,18 @@ const off=(dm,dn)=>({lat:LAT+dm/110540, lon:LON+dn/(111320*Math.cos(LAT*Math.PI/
   assert.ok(res.names.includes('Academia do Bairro')&&res.names.includes('Studio Pilates Vida')&&!res.names.includes('Academia ao Ar Livre'),'busca de concorrentes pelo nome');
   const txt=await p.evaluate(()=>document.querySelector('#report').innerText);
   assert.ok(/Poder de compra/.test(txt)&&/Renda domiciliar per capita média/.test(txt),'seção de poder de compra no relatório');
+  // WorldPop respondendo só avisos em HTML (como em outubro de 2026): a população vem da reserva e a matriz continua completa.
+  const p2=await b.newPage();
+  await p2.route('**/*', r=>r.request().url().includes('worldpop')?r.fulfill({status:200,contentType:'text/html',body:'<br />\n<b>Deprecated</b>:  Return type of Pimple\\Container::offsetExists($id)<br />\n'}):require('./mock-apis')(r));
+  await p2.goto('file://'+require('path').resolve(__dirname,'../index.html'));
+  await p2.fill('#addr','Avenida Paulista, 1000, São Paulo - SP'); await p2.click('#opt summary'); await p2.check('#nocache');
+  for(const [k,v] of Object.entries({area:900,areaMin:800,aluguel:45000,fixos:80000,ticket:149,margem:70,invest:2500000,cap:3000})) await p2.fill('#'+k,String(v));
+  await p2.click('#go'); await p2.waitForSelector('#s-resumo',{timeout:90000});
+  const fb=await p2.evaluate(()=>({src:__ANALISE__.R.popSrc?.key,pop:__ANALISE__.R.pop2k,cov:__ANALISE__.R.score.coverage,txt:document.querySelector('#report').innerText}));
+  console.log('reserva:',fb.src,Math.round(fb.pop),fb.cov);
+  assert.strictEqual(fb.src,'dens','população pela densidade do município quando o WorldPop falha');
+  assert.ok(Math.abs(fb.pop-7528.26*Math.PI*4)<1 && fb.cov===1,'reserva calculada e matriz completa');
+  assert.ok(/densidade média/.test(fb.txt),'relatório avisa que a população é estimativa de reserva');
   console.log('OK: teste simulado passou');
   await b.close();
 })();
